@@ -27,6 +27,19 @@ function TaskList({ onEdit }) {
     });
   };
 
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'P1':
+        return '#d32f2f'; // Red
+      case 'P2':
+        return '#ff9800'; // Orange
+      case 'P3':
+        return '#9e9e9e'; // Gray
+      default:
+        return '#9e9e9e';
+    }
+  };
+
   const fetchTasks = async () => {
     try {
       setLoading(true);
@@ -203,6 +216,19 @@ function TaskList({ onEdit }) {
                 gap: 1
               }}
             >
+              {task.priority && (
+                <Chip
+                  label={task.priority}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    backgroundColor: getPriorityColor(task.priority),
+                    color: 'white'
+                  }}
+                />
+              )}
               {task.due_date && (
                 <Chip
                   icon={<EventIcon sx={{ fontSize: 14 }} />}
