@@ -11,16 +11,30 @@ Format: docs/templates/epic-and-stories-template.md
       - Each task can have an optional `dueDate` value.
       - When present, `dueDate` is stored as an ISO date string in `YYYY-MM-DD` format.
       - Tasks without a due date are supported (no `dueDate` set).
+    - Technical Requirements:
+      - Frontend task shape includes `dueDate?: string` stored in `YYYY-MM-DD`.
+      - Update the form payload to use `dueDate` (current UI uses `due_date` in [packages/frontend/src/TaskForm.js](packages/frontend/src/TaskForm.js)).
+      - All date comparisons must treat `YYYY-MM-DD` as a local calendar date (avoid timezone shifts).
   - Story: Add priority (P1/P2/P3) to tasks
     - Acceptance Criteria:
       - Each task has a `priority` value.
       - Allowed values are `P1`, `P2`, and `P3`.
+    - Technical Requirements:
+      - Frontend task shape includes `priority: 'P1' | 'P2' | 'P3'`.
+      - Task persistence schema includes `priority` for every task.
   - Story: Default new tasks to priority P3
     - Acceptance Criteria:
       - When creating a new task, if the user does not choose a priority, the task is saved with priority `P3`.
+    - Technical Requirements:
+      - In the task create flow, default `priority` to `P3` (current form initializes `title`, `description`, `due_date` only in [packages/frontend/src/TaskForm.js](packages/frontend/src/TaskForm.js)).
   - Story: Ignore invalid due dates
     - Acceptance Criteria:
       - If a task’s `dueDate` is not a valid `YYYY-MM-DD` date, it is treated as if no due date is present.
+    - Technical Requirements:
+      - Implement a shared validation helper (regex + date validity check) and apply it:
+        - When reading persisted tasks.
+        - When saving edits/creates.
+      - If invalid, persist `dueDate` as absent (e.g., `undefined`/omitted or `null`) rather than an invalid string.
 
 - Epic: Task Create and Edit Experience
   - Story: Allow setting and clearing a task due date
@@ -28,10 +42,16 @@ Format: docs/templates/epic-and-stories-template.md
       - Users can set a due date on a task.
       - Users can clear a previously set due date.
       - Changes persist in local storage.
+    - Technical Requirements:
+      - Update [packages/frontend/src/TaskForm.js](packages/frontend/src/TaskForm.js) to bind the date input to `dueDate` and support clearing (empty string maps to “no due date”).
+      - Refactor save logic in [packages/frontend/src/App.js](packages/frontend/src/App.js) to persist task changes to `localStorage` (today it uses `fetch('/api/tasks')`).
   - Story: Allow setting a task priority
     - Acceptance Criteria:
       - Users can set a task’s priority to `P1`, `P2`, or `P3`.
       - Changes persist in local storage.
+    - Technical Requirements:
+      - Add a priority selector to [packages/frontend/src/TaskForm.js](packages/frontend/src/TaskForm.js) (e.g., MUI `Select` with P1/P2/P3).
+      - Ensure edits flow sets the selector from the task’s existing `priority`.
 
 - Epic: Date-Based Task Filters
   - Story: Add filter tabs for All, Today, and Overdue
@@ -39,23 +59,40 @@ Format: docs/templates/epic-and-stories-template.md
       - The UI includes filter tabs: **All**, **Today**, and **Overdue**.
       - **Today** shows tasks whose `dueDate` equals the user’s current local date.
       - **Overdue** shows tasks whose `dueDate` is before the user’s current local date.
+    - Technical Requirements:
+      - Add a `filter` state (e.g., `'all' | 'today' | 'overdue'`) in [packages/frontend/src/App.js](packages/frontend/src/App.js) or [packages/frontend/src/TaskList.js](packages/frontend/src/TaskList.js).
+      - Implement local-date comparison helpers based on `YYYY-MM-DD` strings (do not rely on UTC parsing).
+      - Render MUI tabs for filter selection (current list UI has no filter controls in [packages/frontend/src/TaskList.js](packages/frontend/src/TaskList.js)).
   - Story: Show completed tasks in All filter
     - Acceptance Criteria:
       - In the **All** view, both completed and incomplete tasks are displayed.
+    - Technical Requirements:
+      - Filtering logic must not exclude completed tasks when filter is `all`.
   - Story: Hide completed tasks in Today filter
     - Acceptance Criteria:
       - In the **Today** view, completed tasks are not displayed.
+    - Technical Requirements:
+      - Filtering logic must include `completed === false` when filter is `today`.
   - Story: Hide completed tasks in Overdue filter
     - Acceptance Criteria:
       - In the **Overdue** view, completed tasks are not displayed.
+    - Technical Requirements:
+      - Filtering logic must include `completed === false` when filter is `overdue`.
 
 - Epic: Local-Only Storage Constraint
   - Story: Keep task data stored locally only
     - Acceptance Criteria:
       - Task data is persisted locally (no external storage).
+    - Technical Requirements:
+      - Replace API-based persistence with browser `localStorage` (current app uses backend endpoints from [packages/frontend/src/App.js](packages/frontend/src/App.js) and [packages/frontend/src/TaskList.js](packages/frontend/src/TaskList.js)).
+      - Define a single `localStorage` key for tasks (e.g., `todo.tasks`) and store an array of task objects as JSON.
+      - On app load, initialize UI state from `localStorage`.
   - Story: Ensure no backend changes are required
     - Acceptance Criteria:
       - The feature works without any backend/API changes.
+    - Technical Requirements:
+      - Frontend must not require any of the task endpoints in [packages/backend/src/app.js](packages/backend/src/app.js) to be running.
+      - Do not modify backend routes/schema to deliver MVP behavior.
 
 ## Post-MVP
 
@@ -64,26 +101,41 @@ Format: docs/templates/epic-and-stories-template.md
     - Acceptance Criteria:
       - Overdue tasks are visually highlighted in the task list.
       - Overdue is determined by `dueDate` being before the user’s current local date.
+    - Technical Requirements:
+      - Add an “overdue” computed flag per task when rendering the list in [packages/frontend/src/TaskList.js](packages/frontend/src/TaskList.js).
+      - Apply styling via MUI theme tokens (e.g., `theme.palette.error.*`) rather than introducing new hard-coded colors.
 
 - Epic: Task Sorting Enhancements
   - Story: Sort tasks with overdue items first
     - Acceptance Criteria:
       - When sorting is applied, overdue tasks appear before non-overdue tasks.
+    - Technical Requirements:
+      - Implement a single sort comparator that uses the shared overdue predicate (local date logic).
   - Story: Sort tasks by priority (P1 to P3)
     - Acceptance Criteria:
       - When sorting is applied, higher priority tasks come first in the order `P1`, then `P2`, then `P3`.
+    - Technical Requirements:
+      - Map priority to rank (e.g., P1=1, P2=2, P3=3) and compare ascending.
   - Story: Sort tasks by due date ascending
     - Acceptance Criteria:
       - When sorting is applied, tasks with due dates are ordered from earliest to latest.
+    - Technical Requirements:
+      - Compare due dates using `YYYY-MM-DD` string comparison or by converting to a local-date numeric value.
   - Story: Place tasks without due dates last
     - Acceptance Criteria:
       - When sorting is applied, tasks without a due date appear after tasks with a due date.
+    - Technical Requirements:
+      - Sort comparator must treat missing/invalid due dates as “undated” and place them at the end.
 
 - Epic: Priority Badges
   - Story: Display a priority badge on tasks
     - Acceptance Criteria:
       - Each task displays a badge indicating its priority (`P1`, `P2`, or `P3`).
+    - Technical Requirements:
+      - Render a priority indicator in [packages/frontend/src/TaskList.js](packages/frontend/src/TaskList.js) (e.g., MUI `Chip` alongside the existing due date chip).
   - Story: Use distinct badge colors for P1, P2, and P3
     - Acceptance Criteria:
       - Priority badges use distinct colors for each level.
       - Color mapping follows: `P1` red, `P2` orange, `P3` gray.
+    - Technical Requirements:
+      - Use MUI theme colors to express red/orange/gray (e.g., `error`, `warning`, `grey`) rather than adding new hex values.
